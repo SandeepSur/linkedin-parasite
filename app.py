@@ -1,17 +1,13 @@
 import os
+import tempfile
+import traceback
 from flask import Flask, request, jsonify
 from werkzeug.utils import secure_filename
 import pytesseract
 import fitz  # PyMuPDF
 from PIL import Image
-import traceback
 
 app = Flask(__name__)
-UPLOAD_FOLDER = 'uploads'
-app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
-
-if not os.path.exists(UPLOAD_FOLDER):
-    os.makedirs(UPLOAD_FOLDER)
 
 @app.route('/upload', methods=['POST'])
 def upload_file():
@@ -22,24 +18,27 @@ def upload_file():
     if file.filename == '':
         return jsonify({"error": "No selected file"}), 400
 
-    filename = secure_filename(file.filename)
-    filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-    file.save(filepath)
-
     try:
-        doc = fitz.open(filepath)
+        # Save the file temporarily
+        filename = secure_filename(file.filename)
+        temp_pdf = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf")
+        file.save(temp_pdf.name)
+
+        doc = fitz.open(temp_pdf.name)
         all_text = ""
         for page_num in range(len(doc)):
             page = doc.load_page(page_num)
             pix = page.get_pixmap(dpi=300)
-            image_path = os.path.join(app.config['UPLOAD_FOLDER'], f"page_{page_num}.png")
-            pix.save(image_path)
 
-            image = Image.open(image_path)
-            text = pytesseract.image_to_string(image)
-            all_text += f"\n\n--- Page {page_num + 1} ---\n{text.strip()}"
-            os.remove(image_path)
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as temp_img:
+                pix.save(temp_img.name)
+                image = Image.open(temp_img.name)
+                text = pytesseract.image_to_string(image)
+                all_text += f"\n\n--- Page {page_num + 1} ---\n{text.strip()}"
+                image.close()
+                os.remove(temp_img.name)
 
+        os.remove(temp_pdf.name)
         return jsonify({"extracted_text": all_text})
 
     except Exception as e:
