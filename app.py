@@ -4,11 +4,13 @@ from werkzeug.utils import secure_filename
 import pytesseract
 import fitz  # PyMuPDF
 from PIL import Image
+import traceback
 
 app = Flask(__name__)
 UPLOAD_FOLDER = 'uploads'
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
+# Create upload folder if it doesn't exist
 if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER)
 
@@ -28,25 +30,28 @@ def upload_file():
     try:
         doc = fitz.open(filepath)
         all_text = ""
-        max_pages = 10  # optional safety for free hosting
-
-        for page_num in range(min(len(doc), max_pages)):
+        for page_num in range(len(doc)):
             page = doc.load_page(page_num)
             pix = page.get_pixmap(dpi=300)
             image_path = os.path.join(app.config['UPLOAD_FOLDER'], f"page_{page_num}.png")
             pix.save(image_path)
 
-            with Image.open(image_path) as image:
-                image = image.convert("RGB")  # Ensure compatibility with Tesseract
-                text = pytesseract.image_to_string(image)
-                all_text += f"\n\n--- Page {page_num + 1} ---\n{text.strip()}"
-
-            os.remove(image_path)
+            image = Image.open(image_path)
+            text = pytesseract.image_to_string(image)
+            all_text += f"\n\n--- Page {page_num + 1} ---\n{text.strip()}"
+            os.remove(image_path)  # Clean up image
 
         return jsonify({"extracted_text": all_text})
 
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        # Log full error traceback
+        error_trace = traceback.format_exc()
+        print(error_trace)
+        return jsonify({
+            "error": str(e),
+            "trace": error_trace
+        }), 500
 
 if __name__ == '__main__':
     app.run(debug=True)
+
