@@ -44,7 +44,7 @@ def upload_file():
         return jsonify({"extracted_text": all_text})
 
     except Exception as e:
-        # Log full error traceback
+        import traceback
         error_trace = traceback.format_exc()
         print(error_trace)
         return jsonify({
