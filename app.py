@@ -10,7 +10,6 @@ app = Flask(__name__)
 UPLOAD_FOLDER = 'uploads'
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
-# Create upload folder if it doesn't exist
 if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER)
 
@@ -39,13 +38,13 @@ def upload_file():
             image = Image.open(image_path)
             text = pytesseract.image_to_string(image)
             all_text += f"\n\n--- Page {page_num + 1} ---\n{text.strip()}"
-            os.remove(image_path)  # Clean up image
+            os.remove(image_path)
 
         return jsonify({"extracted_text": all_text})
 
     except Exception as e:
-        import traceback
         error_trace = traceback.format_exc()
+        print("=== TRACEBACK ===")
         print(error_trace)
         return jsonify({
             "error": str(e),
@@ -54,4 +53,3 @@ def upload_file():
 
 if __name__ == '__main__':
     app.run(debug=True)
-
