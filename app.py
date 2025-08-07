@@ -28,16 +28,20 @@ def upload_file():
     try:
         doc = fitz.open(filepath)
         all_text = ""
-        for page_num in range(len(doc)):
+        max_pages = 10  # optional safety for free hosting
+
+        for page_num in range(min(len(doc), max_pages)):
             page = doc.load_page(page_num)
             pix = page.get_pixmap(dpi=300)
             image_path = os.path.join(app.config['UPLOAD_FOLDER'], f"page_{page_num}.png")
             pix.save(image_path)
 
-            image = Image.open(image_path)
-            text = pytesseract.image_to_string(image)
-            all_text += f"\n\n--- Page {page_num + 1} ---\n{text.strip()}"
-            os.remove(image_path)  # clean up image file
+            with Image.open(image_path) as image:
+                image = image.convert("RGB")  # Ensure compatibility with Tesseract
+                text = pytesseract.image_to_string(image)
+                all_text += f"\n\n--- Page {page_num + 1} ---\n{text.strip()}"
+
+            os.remove(image_path)
 
         return jsonify({"extracted_text": all_text})
 
